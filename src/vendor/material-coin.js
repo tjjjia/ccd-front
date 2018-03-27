@@ -1,0 +1,385 @@
+
+var gui1_X;
+/**
+ * @author TatumCreative (Greg Tatum) / http://gregtatum.com/
+modified by tjjjia
+
+bump maps supported with MeshPhongMaterial or MeshStandardMaterial
+
+
+
+
+
+ */
+
+var constants = {
+
+	combine: {
+
+		'THREE.MultiplyOperation': THREE.MultiplyOperation,
+		'THREE.MixOperation': THREE.MixOperation,
+		'THREE.AddOperation': THREE.AddOperation
+
+	},
+
+	side: {
+
+		'THREE.FrontSide': THREE.FrontSide,
+		'THREE.BackSide': THREE.BackSide,
+		'THREE.DoubleSide': THREE.DoubleSide
+
+	},
+
+	colors: {
+
+		'THREE.NoColors': THREE.NoColors,
+		'THREE.FaceColors': THREE.FaceColors,
+		'THREE.VertexColors': THREE.VertexColors
+
+	},
+
+	blendingMode: {
+
+		'THREE.NoBlending': THREE.NoBlending,
+		'THREE.NormalBlending': THREE.NormalBlending,
+		'THREE.AdditiveBlending': THREE.AdditiveBlending,
+		'THREE.SubtractiveBlending': THREE.SubtractiveBlending,
+		'THREE.MultiplyBlending': THREE.MultiplyBlending,
+		'THREE.CustomBlending': THREE.CustomBlending
+
+	},
+
+	equations: {
+
+		'THREE.AddEquation': THREE.AddEquation,
+		'THREE.SubtractEquation': THREE.SubtractEquation,
+		'THREE.ReverseSubtractEquation': THREE.ReverseSubtractEquation
+
+	},
+
+	destinationFactors: {
+
+		'THREE.ZeroFactor': THREE.ZeroFactor,
+		'THREE.OneFactor': THREE.OneFactor,
+		'THREE.SrcColorFactor': THREE.SrcColorFactor,
+		'THREE.OneMinusSrcColorFactor': THREE.OneMinusSrcColorFactor,
+		'THREE.SrcAlphaFactor': THREE.SrcAlphaFactor,
+		'THREE.OneMinusSrcAlphaFactor': THREE.OneMinusSrcAlphaFactor,
+		'THREE.DstAlphaFactor': THREE.DstAlphaFactor,
+		'THREE.OneMinusDstAlphaFactor': THREE.OneMinusDstAlphaFactor
+
+	},
+
+	sourceFactors: {
+
+		'THREE.DstColorFactor': THREE.DstColorFactor,
+		'THREE.OneMinusDstColorFactor': THREE.OneMinusDstColorFactor,
+		'THREE.SrcAlphaSaturateFactor': THREE.SrcAlphaSaturateFactor
+
+	}
+
+};
+
+function getObjectsKeys( obj ) {
+
+	var keys = [];
+
+	for ( var key in obj ) {
+
+		if ( obj.hasOwnProperty( key ) ) {
+
+			keys.push( key );
+
+		}
+
+	}
+
+	return keys;
+
+}
+
+var envMaps = ( function () {
+
+	// var path = '../../examples/textures/cube/SwedishRoyalCastle/';
+	var path = 'vendor/';
+	var format = '.jpg';
+	var urls = [
+		path + 'px' + format, path + 'nx' + format,
+		path + 'py' + format, path + 'ny' + format,
+		path + 'pz' + format, path + 'nz' + format
+	];
+
+	var reflectionCube = new THREE.CubeTextureLoader().load( urls );
+	reflectionCube.format = THREE.RGBFormat;
+
+	var refractionCube = new THREE.CubeTextureLoader().load( urls );
+	refractionCube.mapping = THREE.CubeRefractionMapping;
+	refractionCube.format = THREE.RGBFormat;
+
+	return {
+		none: null,
+		reflection: reflectionCube,
+		refraction: refractionCube
+	};
+
+} )();
+
+var envMapKeys = getObjectsKeys( envMaps );
+
+var textureMaps = ( function () {
+
+	return {
+		none: null,
+		grass: new THREE.TextureLoader().load( 'vendor/grasslight-thin.jpg' ),
+		kucharski_01: new THREE.TextureLoader().load( 'assets/baptiste-kucharski-coin-01.jpg' ),
+		kucharski_02: new THREE.TextureLoader().load( 'assets/baptiste-kucharski-coin-02.jpg' )
+	};
+
+} )();
+
+var textureMapKeys = getObjectsKeys( textureMaps );
+
+function generateVertexColors( geometry ) {
+
+	for ( var i = 0, il = geometry.faces.length; i < il; i ++ ) {
+
+		geometry.faces[ i ].vertexColors.push( new THREE.Color().setHSL(
+			i / il * Math.random(),
+			0.5,
+			0.5
+		) );
+		geometry.faces[ i ].vertexColors.push( new THREE.Color().setHSL(
+			i / il * Math.random(),
+			0.5,
+			0.5
+		) );
+		geometry.faces[ i ].vertexColors.push( new THREE.Color().setHSL(
+			i / il * Math.random(),
+			0.5,
+			0.5
+		) );
+
+		geometry.faces[ i ].color = new THREE.Color().setHSL(
+			i / il * Math.random(),
+			0.5,
+			0.5
+		);
+
+	}
+
+}
+
+function generateMorphTargets( mesh, geometry ) {
+
+	var vertices = [], scale;
+
+	for ( var i = 0; i < geometry.vertices.length; i ++ ) {
+
+		vertices.push( geometry.vertices[ i ].clone() );
+
+		scale = 1 + Math.random() * 0.3;
+
+		vertices[ vertices.length - 1 ].x *= scale;
+		vertices[ vertices.length - 1 ].y *= scale;
+		vertices[ vertices.length - 1 ].z *= scale;
+
+	}
+
+	geometry.morphTargets.push( { name: 'target1', vertices: vertices } );
+
+}
+
+function handleColorChange( color ) {
+
+	return function ( value ) {
+
+		if ( typeof value === 'string' ) {
+
+			value = value.replace( '#', '0x' );
+
+		}
+
+		color.setHex( value );
+
+	};
+
+}
+
+function needsUpdate( material, geometry ) {
+
+	return function () {
+
+		material.vertexColors = + material.vertexColors; //Ensure number
+		material.side = + material.side; //Ensure number
+		material.needsUpdate = true;
+		geometry.verticesNeedUpdate = true;
+		geometry.normalsNeedUpdate = true;
+		geometry.colorsNeedUpdate = true;
+
+	};
+
+}
+
+function updateMorphs( torus, material ) {
+
+	return function () {
+
+		torus.updateMorphTargets();
+		material.needsUpdate = true;
+
+	};
+
+}
+
+function updateTexture( material, materialKey, textures ) {
+
+	return function ( key ) {
+		material[ materialKey ] = textures[ key ];
+		material.needsUpdate = true;
+
+	};
+
+}
+
+function guiScene( gui, scene ) {
+
+	var folder = gui.addFolder( 'Scene' );
+
+	var data = {
+		background: renderer.getClearColor().getHex(),
+		'ambient light': ambientLight.color.getHex()
+	};
+
+	var color = new THREE.Color();
+	var colorConvert = handleColorChange( color );
+
+	folder.addColor( data, 'background' ).onChange( function ( value ) {
+
+		colorConvert( value );
+
+		renderer.setClearColor( color.getHex() );
+
+	} );
+
+	folder.addColor( data, 'ambient light' ).onChange( handleColorChange( ambientLight.color ) );
+
+	guiSceneFog( folder, scene );
+
+}
+
+function guiSceneFog( folder, scene ) {
+
+	var fogFolder = folder.addFolder( 'scene.fog' );
+
+	var fog = new THREE.Fog( 0x3f7b9d, 0, 60 );
+
+	var data = {
+		fog: {
+			'THREE.Fog()': false,
+			'scene.fog.color': fog.color.getHex()
+		}
+	};
+
+	fogFolder.add( data.fog, 'THREE.Fog()' ).onChange( function ( useFog ) {
+
+		if ( useFog ) {
+
+			scene.fog = fog;
+
+		} else {
+
+			scene.fog = null;
+
+		}
+
+	} );
+
+	fogFolder.addColor( data.fog, 'scene.fog.color' ).onChange( handleColorChange( fog.color ) );
+
+}
+
+function guiMaterial( gui, mesh, material, geometry ) {
+
+	var folder = gui.addFolder( 'THREE.Material' );
+
+	folder.add( material, 'transparent' );
+	folder.add( material, 'opacity', 0, 1 );
+	// folder.add( material, 'blending', constants.blendingMode );
+	// folder.add( material, 'blendSrc', constants.destinationFactors );
+	// folder.add( material, 'blendDst', constants.destinationFactors );
+	// folder.add( material, 'blendEquation', constants.equations );
+	// folder.add( material, 'depthTest' );
+	// folder.add( material, 'depthWrite' );
+	// folder.add( material, 'polygonOffset' );
+	// folder.add( material, 'polygonOffsetFactor' );
+	// folder.add( material, 'polygonOffsetUnits' );
+	// folder.add( material, 'alphaTest', 0, 1 );
+	// folder.add( material, 'overdraw', 0, 5 );
+	folder.add( material, 'visible' );
+	// folder.add( material, 'side', constants.side ).onChange( needsUpdate( material, geometry ) );
+
+}
+
+
+function guiMeshPhongMaterial( gui, mesh, material, geometry ) {
+	material.bumpMap = textureMaps.kucharski_01;
+	material.bumpScale = 0.03;
+	material.color = new THREE.Color( 0xcccccc );;
+
+
+	var data = {
+		color: material.color.getHex(),
+		emissive: material.emissive.getHex(),
+		specular: material.specular.getHex(),
+		envMaps: envMapKeys,
+		map: textureMapKeys,
+		lightMap: textureMapKeys,
+		specularMap: textureMapKeys,
+		alphaMap: textureMapKeys,
+		bumpMap: textureMapKeys[2] // manual set dropdown (only visually)
+	};
+
+	var folder = gui.addFolder( 'THREE.MeshPhongMaterial' );
+
+	folder.addColor( data, 'color' ).onChange( handleColorChange( material.color ) );
+	folder.addColor( data, 'emissive' ).onChange( handleColorChange( material.emissive ) );
+	folder.addColor( data, 'specular' ).onChange( handleColorChange( material.specular ) );
+
+	folder.add( material, 'shininess', 0, 100 );
+	// folder.add( material, 'flatShading' ).onChange( needsUpdate( material, geometry ) );
+	folder.add( material, 'wireframe' );
+	folder.add( material, 'wireframeLinewidth', 0, 2 );
+	// folder.add( material, 'vertexColors', constants.colors );
+	// folder.add( material, 'fog' );
+	// folder.add( data, 'envMaps', envMapKeys ).onChange( updateTexture( material, 'envMap', envMaps ) );
+	folder.add( data, 'map', textureMapKeys ).onChange( updateTexture( material, 'map', textureMaps ) );
+	// folder.add( data, 'lightMap', textureMapKeys ).onChange( updateTexture( material, 'lightMap', textureMaps ) );
+	// folder.add( data, 'specularMap', textureMapKeys ).onChange( updateTexture( material, 'specularMap', textureMaps ) );
+	folder.add( data, 'alphaMap', textureMapKeys ).onChange( updateTexture( material, 'alphaMap', textureMaps ) );
+	folder.add( data, 'bumpMap', textureMapKeys ).onChange( updateTexture( material, 'bumpMap', textureMaps ) );
+	folder.add( material, 'bumpScale', 0.000, 1.000 );
+
+
+}
+
+function chooseFromHash( gui, mesh, geometry ) {
+
+	// var selectedMaterial = window.location.hash.substring( 1 ) || 'MeshBasicMaterial';
+	var selectedMaterial = window.location.hash.substring( 1 ) || 'MeshPhongMaterial';
+	var material;
+
+	switch ( selectedMaterial ) {
+		case 'MeshPhongMaterial' :
+
+			material = new THREE.MeshPhongMaterial( { color: 0x2194CE } );
+
+			guiMaterial( gui, mesh, material, geometry );
+			guiMeshPhongMaterial( gui, mesh, material, geometry );
+
+
+			return material;
+
+			break;
+	}
+
+}
