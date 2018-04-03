@@ -5,7 +5,7 @@ gulp.task('inlinesource', function () {
 	var options = {
 		compress: true
 	};
-	return gulp.src('./src/coin-fx.html')
+	return gulp.src('./src/coin-json.html')
 		.pipe(inlinesource(options))
 		.pipe(gulp.dest('./dist'));
 });

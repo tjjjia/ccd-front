@@ -1,0 +1,217 @@
+<!-- =======================
+@tjjjia
+this script is intended to be a prototype of the final js
+---------------------------->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Coin test</title>
+	<style>
+		body {
+			font-family: monospace;
+			margin:0;
+			overflow: hidden;
+		}
+
+		canvas { width: 100%; height: 100% }
+
+		#newWindow {
+			display: block;
+			position: absolute;
+			bottom: 0.3em;
+			left: 0.5em;
+			color: #fff;
+		}
+	</style>
+</head>
+<body>
+	<div id="three"></div>
+
+	<a id="newWindow" href="./coin-json.html" target="_blank">Open in New Window</a>
+	<script src="../node_modules/three/build/three.min.js" inline></script>
+
+	<script>
+		/**********************************************
+		*	json texture loader comes here
+		*	@tim this is yours to handle
+		*
+		*/
+		var folder = "assets/";
+		var json = {
+			"coins": [
+					{ "heads": folder +"baptiste-kucharski-coin-01.jpg",
+						"tails": folder +"baptiste-kucharski-coin-02.jpg"},
+					{ "heads": folder +"coin-1-1024.jpg",
+						"tails": folder +"coin-a-1024.jpg"},
+					{ "heads": folder +"coin-2-1024.jpg",
+						"tails": folder +"coin-b-1024.jpg"},
+					{ "heads": folder +"coin-3-1024.jpg",
+						"tails": folder +"coin-c-1024.jpg"},
+					{ "heads": folder +"coin-4-1024.jpg",
+						"tails": folder +"coin-d-1024.jpg"},
+					// alternative formatting:
+					{ "heads": "assets/coin-5-1024.jpg",
+						"tails": "assets/coin-e-1024.jpg"}
+
+			]
+		};
+		// end dummy json
+		var targetElement = document.querySelector("#three");
+
+		document.getElementById( 'newWindow' ).href += window.location.hash;
+
+		// three js starts here ----------------------------------------------
+		var scene = new THREE.Scene();
+		var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 10, 50 );
+		camera.position.z = 30;
+		var coin;
+		var coin__index = 0;
+		var material__edge, material__heads, material__tails;
+
+		var rotation__count = 0;
+
+		// renderer
+		var renderer = new THREE.WebGLRenderer( { antialias: true } );
+		renderer.setPixelRatio( window.devicePixelRatio );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		renderer.setClearColor( 0x0000ff, 1 );
+
+		targetElement.appendChild( renderer.domElement );
+
+		// lights
+		var ambientLight = new THREE.AmbientLight( 0x000000 );
+		scene.add( ambientLight );
+
+		var lights = [];
+		lights[ 0 ] = new THREE.PointLight( 0xffffdd, 1, 0 );
+		lights[ 1 ] = new THREE.PointLight( 0xffffdd, 1, 0 );
+		lights[ 2 ] = new THREE.PointLight( 0xffffdd, 1, 0 );
+
+		lights[ 0 ].position.set( 100, 200, 0 );
+		lights[ 1 ].position.set( 100, 200, 100 );
+		lights[ 2 ].position.set( -100, -200, 100 );
+
+		scene.add( lights[ 0 ] );
+		scene.add( lights[ 1 ] );
+		scene.add( lights[ 2 ] );
+
+		// texture loader from json list
+		var texture__array = {};
+		for (var i = 0; i < json.coins.length; i++) {
+			texture__array[i] = {};
+			texture__array[i].heads = new THREE.TextureLoader().load( json.coins[i].heads );
+			texture__array[i].tails = new THREE.TextureLoader().load( json.coins[i].tails );
+		}
+
+		var kucharski_01 = new THREE.TextureLoader().load( json.coins[3].heads );
+		var kucharski_02 = new THREE.TextureLoader().load( json.coins[3].tails );
+
+		// start materials
+		var coin__material__color = new THREE.Color().setHex( 0x979797 );
+		var coin__material__specular = new THREE.Color().setHex( 0xc5a53f );
+		var coin__material__shininess = 30;
+		var coin__material__bumpScale = 0.03;
+
+		material__edge = new THREE.MeshPhongMaterial();
+		material__heads = new THREE.MeshPhongMaterial();
+		material__tails = new THREE.MeshPhongMaterial();
+
+		var coin__materials__array = [];
+		coin__materials__array.push(material__edge); // materialindex = 0
+		coin__materials__array.push(material__heads); //materialindex = 1
+		coin__materials__array.push(material__tails); // materialindex = 2
+
+		for (var i = 0; i < coin__materials__array.length; i++) {
+			coin__materials__array[i].color = coin__material__color;
+			coin__materials__array[i].specular = coin__material__specular;
+			coin__materials__array[i].shininess = coin__material__shininess;
+			coin__materials__array[i].bumpScale = coin__material__bumpScale;
+		}
+
+		/*
+		technical features of the euro coins
+		Denomination	Diameter	Edge thickness (benchmark)
+		50 cent	24.25 mm	2.38 mm
+			1:10.23
+		1 euro	23.25 mm	2.33mm
+			1:9.98
+		2 euro	25.75 mm	2.20mm
+			1:11.70
+
+		src: https://www.bundesbank.de/Redaktion/EN/FAQ_List/Core_business_areas/cash_management_euro_coins.html?docId=91710
+		*/
+
+		// var geometry = new THREE.TorusKnotGeometry( 10, 3, 100, 16 );
+		var coin_radius = 10;
+		var coin_radSegments = 32;
+		var geometry = new THREE.CylinderGeometry( coin_radius, coin_radius, coin_radius/10, coin_radSegments );
+
+		for (var i = 0; i < geometry.faces.length; i++) {
+			if (i < (geometry.faces.length * .5) ){ // first half = EDGES
+				geometry.faces[i].materialIndex = 0;
+			} else if (i > (geometry.faces.length * .5 -1) && i < (geometry.faces.length * .75) ){ // third quarter = HEADS
+				geometry.faces[i].materialIndex = 1;
+			} else { // last quarter = TAILS
+				geometry.faces[i].materialIndex = 2;
+			}
+		}
+
+		coin = new THREE.Mesh( geometry, coin__materials__array );
+		scene.add( coin );
+
+		coin.rotation.z += .5*Math.PI;
+		material__heads.bumpMap = texture__array[ coin__index ].heads;
+		material__tails.bumpMap = texture__array[ coin__index ].tails;
+
+		animate();
+		function animate() {
+			requestAnimationFrame( animate );
+
+			// transformations
+			coin.rotation.z += 0.005;
+			coin.rotation.y += 0.050;
+
+			var rotation__temp = parseInt( Math.floor( coin.rotation.y / (2*Math.PI) ) );
+
+			if (rotation__count !== rotation__temp) {
+				rotation__count = rotation__temp;
+				// new rotation, update coin!
+				updateCoin();
+			} else {
+				// still on the same rotation, do nothing
+			}
+
+
+			function updateCoin() {
+				// texture updates
+				coin__index += 1;
+				coin__index = coin__index % Object.keys(texture__array).length;
+
+				material__heads.bumpMap = texture__array[ coin__index ].heads;
+				material__tails.bumpMap = texture__array[ coin__index ].tails;
+			}
+
+
+			render();
+		};
+
+
+		/* interactions go here */
+		window.addEventListener( 'resize', function () {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+		}, false );
+
+
+		function render() {
+			/* render optimisations go here, eventually */
+			renderer.render(scene, camera);
+		}
+
+	</script>
+</body>
+</html>
