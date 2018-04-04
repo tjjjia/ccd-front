@@ -1,0 +1,273 @@
+<!-- =======================
+@tjjjia
+this script is intended to be a prototype of the final js
+---------------------------->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Coin test</title>
+	<style>
+		body {
+			font-family: monospace;
+			margin:0;
+			overflow: hidden;
+		}
+
+		canvas { width: 100%; height: 100% }
+
+		#newWindow {
+			display: block;
+			position: absolute;
+			bottom: 0.3em;
+			left: 0.5em;
+			color: #fff;
+		}
+	</style>
+</head>
+<body>
+	<div id="three"></div>
+
+	<a id="newWindow" href="./coin-json.html" target="_blank">Open in New Window</a>
+	<script src="../node_modules/three/build/three.min.js" inline></script>
+
+	<script>
+		/**********************************************
+		*	json texture loader here
+		*
+		*/
+		var folder = "assets/";
+		var json = {
+			"coins": [
+					{ "heads": folder +"baptiste-kucharski-coin-01.jpg",
+						"tails": folder +"baptiste-kucharski-coin-02.jpg"},
+					{ "heads": folder +"coin-1-1024.jpg",
+						"tails": folder +"coin-a-1024.jpg"},
+					{ "heads": folder +"coin-2-1024.jpg",
+						"tails": folder +"coin-b-1024.jpg"},
+					{ "heads": folder +"coin-3-1024.jpg",
+						"tails": folder +"coin-c-1024.jpg"},
+					{ "heads": folder +"coin-4-1024.jpg",
+						"tails": folder +"coin-d-1024.jpg"},
+					// alternative formatting:
+					{ "heads": "assets/coin-5-1024.jpg",
+						"tails": "assets/coin-e-1024.jpg"}
+
+			]
+		};
+		// end dummy json
+		var targetElement = document.querySelector("#three");
+
+		document.getElementById( 'newWindow' ).href += window.location.hash;
+
+		// three js starts here ----------------------------------------------
+		var scene = new THREE.Scene();
+		var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 10, 400 );
+		camera.position.z = 80;
+		camera.position.y = 40;
+
+		var coin__array = [];
+
+		var coin;
+		var coin__index = 0;
+		var material__edge, material__heads, material__tails;
+		var mouseX, mouseY;
+
+		var timer__start = [];
+		var timer__elapsed = [];
+		var rotation__count = 0;
+
+		// renderer
+		var renderer = new THREE.WebGLRenderer( { antialias: true } );
+		renderer.setPixelRatio( window.devicePixelRatio );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		renderer.setClearColor( 0x0000ff, 1 );
+
+		targetElement.appendChild( renderer.domElement );
+
+		// lights
+		var ambientLight = new THREE.AmbientLight( 0x000000 );
+		scene.add( ambientLight );
+
+		var lights = [];
+		lights[ 0 ] = new THREE.PointLight( 0xffffdd, 1, 0 );
+		lights[ 1 ] = new THREE.PointLight( 0xffffdd, 1, 0 );
+		lights[ 2 ] = new THREE.PointLight( 0xffffdd, 1, 0 );
+
+		lights[ 0 ].position.set( 100, 200, 0 );
+		lights[ 1 ].position.set( 100, 200, 100 );
+		lights[ 2 ].position.set( -100, -200, 100 );
+
+		scene.add( lights[ 0 ] );
+		scene.add( lights[ 1 ] );
+		scene.add( lights[ 2 ] );
+
+
+		// start materials
+		var coin__materials__array = [];
+
+		// actual material instances
+		material__edge = new THREE.MeshPhongMaterial();
+		material__heads = new THREE.MeshPhongMaterial();
+		material__tails = new THREE.MeshPhongMaterial();
+
+		// texture loader from json list
+		var texture__array = {};
+		for (var i = 0; i < json.coins.length; i++) {
+			texture__array[i] = {};
+			texture__array[i].heads = new THREE.TextureLoader().load( json.coins[i].heads );
+			texture__array[i].tails = new THREE.TextureLoader().load( json.coins[i].tails );
+		}
+
+		// other parameters
+		var coin__material__color = new THREE.Color().setHex( 0x979797 );
+		var coin__material__specular = new THREE.Color().setHex( 0xc5a53f );
+		var coin__material__shininess = 30;
+		var coin__material__bumpScale = 0.03;
+
+		// push materials into array
+		coin__materials__array.push(material__edge); // materialindex = 0
+		coin__materials__array.push(material__heads); //materialindex = 1
+		coin__materials__array.push(material__tails); // materialindex = 2
+
+		for (var i = 0; i < coin__materials__array.length; i++) {
+			coin__materials__array[i].color = coin__material__color;
+			coin__materials__array[i].specular = coin__material__specular;
+			coin__materials__array[i].shininess = coin__material__shininess;
+			coin__materials__array[i].bumpScale = coin__material__bumpScale;
+		}
+
+		material__heads.bumpMap = texture__array[ 0 ].heads;
+		material__tails.bumpMap = texture__array[ 0 ].tails;
+		// ---- end materials
+
+		// start geometry
+		var coin_radius = 10;
+		var coin_radSegments = 32;
+		var geometry = new THREE.CylinderGeometry( coin_radius, coin_radius, coin_radius/10, coin_radSegments );
+
+		for (var i = 0; i < geometry.faces.length; i++) {
+			if (i < (geometry.faces.length * .5) ){ // first half = EDGES
+				geometry.faces[i].materialIndex = 0;
+			} else if (i > (geometry.faces.length * .5 -1) && i < (geometry.faces.length * .75) ){ // third quarter = HEADS
+				geometry.faces[i].materialIndex = 1;
+			} else { // last quarter = TAILS
+				geometry.faces[i].materialIndex = 2;
+			}
+		}
+
+		// coin__array[0] = new THREE.Mesh( geometry, coin__materials__array );
+		// scene.add( coin__array[0] );
+		// ---- end geometry
+
+
+		function Coin(x, z) {
+			var coin__new = new THREE.Mesh( geometry, coin__materials__array );
+			coin__array.push( coin__new );
+			timer__start.push( Date.now() );
+			scene.add( coin__array[coin__array.length -1] );
+			// coin__array[coin__array.length -1].position.y = 30 + ;
+			coin__array[coin__array.length -1].position.x = x * 200 -100;
+			coin__array[coin__array.length -1].position.y = -z * 100 +70;
+			coin__array[coin__array.length -1].rotation.z = Math.random();
+			var uuid = coin__array[coin__array.length -1].uuid;
+			// console.log( uuid + " added to scene." );
+			// console.log( coin__array.length + " coins currently in scene." );
+		}
+
+		animate();
+
+		function animate() {
+			requestAnimationFrame( animate );
+
+			// timer__elapsed = Date.now() - timer__start; // current time in milliseconds
+			// console.log(timer__elapsed);
+			if ( touch_trigger === 1) {
+				Coin(mouseX, mouseY);
+			}
+
+			// transformations
+			if (coin__array.length > 0) {
+				for (var i = 0; i < coin__array.length; i++) {
+					timer__elapsed[i] = Date.now() - timer__start[i]; // current time in milliseconds
+					coin__array[i].rotation.x += 0.300;
+					coin__array[i].rotation.z += 0.005;
+					coin__array[i].rotation.y += 0.050;
+					// coin__array[i].position.y += timer__elapsed / 10000;
+					// coin__array[i].position.y = -7 + Math.abs( 15* Math.sin(timer__elapsed /1000) );
+					// coin__array[i].position.y = 2* Math.sin( timer__elapsed[i]/1000 *(2*Math.PI)  );
+					// coin__array[i].position.y += .7 * ( -.12 + Math.sin( (timer__elapsed[i]+12) /1000 * 2*Math.Pi) );
+					// coin__array[i].position.y +=  Math.sin( timer__elapsed[i]/1000 *(2*Math.PI)  );
+					var period = 1200; // milliseconds
+
+					coin__array[i].position.y += 5 * Math.sin( ( (timer__elapsed[i]+.3*period) % period) /period * (2*Math.PI)  );
+
+					remove_dropped_coins__time();
+					function remove_dropped_coins__time() {
+						if ( timer__elapsed[i] > .6*period ){
+						// if ( timer__elapsed[i] > .6*period ){
+							var uuid = coin__array[i].uuid;
+
+							scene.remove(coin__array[i]);
+							coin__array[i].geometry.dispose();
+
+							//remove associated variables
+							coin__array.splice(i, 1);
+							timer__start.splice(i, 1);
+							timer__elapsed.splice(i, 1);
+							// console.log( uuid + " removed from scene." );
+							// console.log( coin__array.length + " coins currently in scene." );
+
+						}
+					}
+				}
+			}
+
+			render();
+		};
+
+
+		/* interactions go here */
+		window.addEventListener( 'resize', function () {
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+		}, false );
+
+		/* shooting */
+		var touch_trigger = 0;
+		window.addEventListener( 'mousedown', function(e) {
+			touch_trigger = 1;
+
+			Coin(mouseX, mouseY);
+			// console.log("click");
+
+		}, false );
+
+		window.addEventListener("mousemove", function(e){
+			mouseX = e.clientX/window.innerWidth;
+			mouseY = e.clientY/window.innerHeight;
+			if (touch_trigger === 1) {
+				// console.log("drag");
+			}
+		}, false);
+
+		window.addEventListener("mouseup", function(){
+			touch_trigger = 0;
+			// console.log("-- up");
+		}, false);
+
+
+
+
+		function render() {
+			/* render optimisations go here, eventually */
+			renderer.render(scene, camera);
+		}
+
+
+	</script>
+</body>
+</html>
