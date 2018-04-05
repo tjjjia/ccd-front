@@ -15,7 +15,11 @@ this script is intended to be a prototype of the final js
 			overflow: hidden;
 		}
 
-		canvas { width: 100%; height: 100% }
+		canvas {
+			width: 100%;
+			height: 100%;
+			cursor: crosshair;
+		}
 
 		#newWindow {
 			display: block;
@@ -164,29 +168,31 @@ this script is intended to be a prototype of the final js
 		// ---- end geometry
 
 
-		function Coin(x, z) {
+		function Coin(x, y) {
 			var coin__new = new THREE.Mesh( geometry, coin__materials__array );
 			coin__array.push( coin__new );
 			timer__start.push( Date.now() );
 			scene.add( coin__array[coin__array.length -1] );
-			// coin__array[coin__array.length -1].position.y = 30 + ;
 			coin__array[coin__array.length -1].position.x = x * 200 -100;
-			coin__array[coin__array.length -1].position.y = -z * 100 +70;
-			coin__array[coin__array.length -1].rotation.z = Math.random();
+			coin__array[coin__array.length -1].position.y = -y * 100 +70;
+			coin__array[coin__array.length -1].rotation.z = Date.now() / (2*Math.PI);
 			var uuid = coin__array[coin__array.length -1].uuid;
+
 			// console.log( uuid + " added to scene." );
 			// console.log( coin__array.length + " coins currently in scene." );
 
-			var sound = new THREE.Audio( listener );
+			var sound = new THREE.PositionalAudio( listener );
 
 			// load a sound and set it as the Audio object's buffer
 			var audioLoader = new THREE.AudioLoader();
 			audioLoader.load( 'assets/coin-flip.mp3', function( buffer ) {
 				sound.setBuffer( buffer );
 				sound.setLoop( false );
-				sound.setVolume( 0.5 );
+				sound.setRefDistance( 50 );
+				// sound.setVolume( 0.5 );
 				sound.play();
 			});
+			coin__array[coin__array.length -1].add( sound );
 		}
 
 		animate();
@@ -194,32 +200,30 @@ this script is intended to be a prototype of the final js
 		function animate() {
 			requestAnimationFrame( animate );
 
-			// timer__elapsed = Date.now() - timer__start; // current time in milliseconds
-			// console.log(timer__elapsed);
-			if ( touch_trigger === 1) {
-				Coin(mouseX, mouseY);
+			// check if there are coins in the scene
+			// has the last one 'lived' longer than x milliseconds?
+			if ( timer__elapsed[ timer__elapsed.length - 1 ] > 80 ) {
+				if ( touch_trigger === 1) {
+					Coin(mouseX, mouseY);
+				}
+
 			}
 
 			// transformations
 			if (coin__array.length > 0) {
 				for (var i = 0; i < coin__array.length; i++) {
 					timer__elapsed[i] = Date.now() - timer__start[i]; // current time in milliseconds
-					coin__array[i].rotation.x += 0.300;
+					coin__array[i].rotation.x += 0.100;
 					coin__array[i].rotation.z += 0.005;
 					coin__array[i].rotation.y += 0.050;
-					// coin__array[i].position.y += timer__elapsed / 10000;
-					// coin__array[i].position.y = -7 + Math.abs( 15* Math.sin(timer__elapsed /1000) );
-					// coin__array[i].position.y = 2* Math.sin( timer__elapsed[i]/1000 *(2*Math.PI)  );
-					// coin__array[i].position.y += .7 * ( -.12 + Math.sin( (timer__elapsed[i]+12) /1000 * 2*Math.Pi) );
-					// coin__array[i].position.y +=  Math.sin( timer__elapsed[i]/1000 *(2*Math.PI)  );
 					var period = 1200; // milliseconds
 
 					coin__array[i].position.y += 5 * Math.sin( ( (timer__elapsed[i]+.3*period) % period) /period * (2*Math.PI)  );
+					// coin__array[i].position.z -= .5; // throw effect
 
-					remove_dropped_coins__time();
-					function remove_dropped_coins__time() {
-						if ( timer__elapsed[i] > .6*period ){
-						// if ( timer__elapsed[i] > .6*period ){
+					Coin__dispose();
+					function Coin__dispose() {
+						if ( timer__elapsed[i] > .6 * period ){
 							var uuid = coin__array[i].uuid;
 
 							scene.remove(coin__array[i]);
@@ -229,6 +233,7 @@ this script is intended to be a prototype of the final js
 							coin__array.splice(i, 1);
 							timer__start.splice(i, 1);
 							timer__elapsed.splice(i, 1);
+
 							// console.log( uuid + " removed from scene." );
 							// console.log( coin__array.length + " coins currently in scene." );
 
